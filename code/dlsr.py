@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from sklearn.preprocessing import StandardScaler
 from enum import Enum
+import itertools
 
 def animate_logistic_regression(train_datas, house_enum, feature_x, feature_y):
     # On garde seulement deux features + house
@@ -18,8 +19,8 @@ def animate_logistic_regression(train_datas, house_enum, feature_x, feature_y):
 
     # Initialisation de theta
     theta = np.zeros(X.shape[1])
-    learning_rate = 0.1
-    iterations = 2000
+    learning_rate = 0.3
+    iterations = 4000
 
     thetas = []  # on sauvegarde theta à chaque étape pour l'animation
 
@@ -37,8 +38,16 @@ def animate_logistic_regression(train_datas, house_enum, feature_x, feature_y):
     y_vals = X[:, 2]
 
     # points
-    ax.scatter(x_vals[y == 0], y_vals[y == 0], color="red", label="Autres")
-    ax.scatter(x_vals[y == 1], y_vals[y == 1], color="blue", label=house_enum.name)
+    ax.scatter(x_vals[y == 0], y_vals[y == 0], color="grey", label="others", alpha=0.2)
+    if house_enum.name == "Ravenclaw":
+        ax.scatter(x_vals[y == 1], y_vals[y == 1], color="blue", label=house_enum.name)
+    elif house_enum.name == "Slytherin":
+        ax.scatter(x_vals[y == 1], y_vals[y == 1], color="green", label=house_enum.name)
+    elif house_enum.name == "Gryffindor":
+        ax.scatter(x_vals[y == 1], y_vals[y == 1], color="red", label=house_enum.name)
+    elif house_enum.name == "Hufflepuff":
+        ax.scatter(x_vals[y == 1], y_vals[y == 1], color="yellow", label=house_enum.name)
+    
 
     #line, = ax.plot([], [], 'k--', label="Frontière")
     line, = ax.plot([], [], color="black", linewidth=2, label="Frontière")
@@ -70,11 +79,22 @@ class Houses(Enum):
     Hufflepuff = 3
 
 
+def fill_nan_by_house_mean(train_datas):
+    # Sélectionner les colonnes numériques (pour le calcul des moyennes)
+    colonnes_numeriques = train_datas.select_dtypes(include='number').columns
+
+    # Grouper par maison et remplacer les NaN par la moyenne de chaque groupe
+    for colonne in colonnes_numeriques:
+        train_datas[colonne] = train_datas.groupby('Hogwarts House')[colonne].transform(lambda x: x.fillna(x.mean()))
+
+    return train_datas
+
+
 def init():
     # Load and clean
     train_datas = pd.read_csv("../datasets/dataset_train.csv")
     train_datas.dropna(how='all', inplace=True)
-    #train_datas.fillna(0, inplace=True)
+    train_datas = fill_nan_by_house_mean(train_datas)
     train_datas.drop(["Index", "First Name", "Last Name", "Birthday", "Best Hand"], axis=1, inplace=True)
 
     # normalize
@@ -106,17 +126,16 @@ def compute_gradient(X, y, theta):
 
 
 def gradient_descent(X, y, theta, learning_rate=0.01, iterations=1000):
-    cost_history = []
+    #cost_history = []
     for i in range(iterations):
         gradient = compute_gradient(X, y, theta)
         theta = theta - learning_rate * gradient
         cost = compute_cost(X, y, theta)
-        cost_history.append(cost)
+        #cost_history.append(cost)
         # Optionnel: Affiche le coût toutes les N itérations pour suivre la convergence
         if i % 100 == 0:
             print(f"Iteration {i}, Cost: {cost}")
-    return theta, cost_history
-
+    return theta#, cost_history
 
 
 def logistic_regression_house(train_datas, house_enum):
@@ -136,28 +155,39 @@ def logistic_regression_house(train_datas, house_enum):
     theta = np.zeros(X.shape[1])
 
     # Appliquer la descente de gradient
-    learning_rate = 0.01
-    iterations = 1000
-    theta, cost_history = gradient_descent(X, y, theta, learning_rate, iterations)
+    learning_rate = 0.05
+    iterations = 4000
+    #theta, cost_history = gradient_descent(X, y, theta, learning_rate, iterations)
+    theta = gradient_descent(X, y, theta, learning_rate, iterations)
 
-    # Pour l'instant, affiche les coûts et retourne theta pour usage futur
-    print("Modèle entraîné pour la classe", house_enum.name)
-    print("Paramètres appris : ", theta)
     return theta
 
-import itertools
 
-def main():
-    train_datas = init()
-    #animate_logistic_regression(train_datas, Houses.Ravenclaw, "Herbology", "Charms")
+def schemas(train_datas):
     colonnes_numeriques = train_datas.select_dtypes(include=np.number).drop("Hogwarts House", axis=1).columns
-
     # Pour chaque combinaison unique de deux colonnes
     for feature_x, feature_y in itertools.combinations(colonnes_numeriques, 2):
         print(f"🧪 {feature_x} vs {feature_y}")
+        print("Ravenclaw :")
         animate_logistic_regression(train_datas, Houses.Ravenclaw, feature_x, feature_y)
+        print("Slytherin :")
+        animate_logistic_regression(train_datas, Houses.Slytherin, feature_x, feature_y)
+        print("Gryffindor :")
+        animate_logistic_regression(train_datas, Houses.Gryffindor, feature_x, feature_y)
+        print("Hufflepuff :")
+        animate_logistic_regression(train_datas, Houses.Hufflepuff, feature_x, feature_y)
 
-    # logistic_regression_house(train_datas, Houses.Ravenclaw)
+
+def main():
+    train_datas = init()
+    # TODO Select les bon paramètres pour entrainer chaque house
+    # TODO donc -> statistique par maisons par matièresen plus du pairplot
+    theta_ravenclaw = logistic_regression_house(train_datas, Houses.Ravenclaw)
+    theta_slytherin = logistic_regression_house(train_datas, Houses.Slytherin)
+    theta_gryffindor = logistic_regression_house(train_datas, Houses.Gryffindor)
+    theta_hufflepuff = logistic_regression_house(train_datas, Houses.Hufflepuff)
+
+    schemas(train_datas)
 
 
 if __name__ == "__main__":
